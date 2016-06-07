@@ -3,6 +3,7 @@ package shadowsocks
 import (
 	"encoding/binary"
 	"fmt"
+	"github.com/spance/suft/protocol"
 	"io"
 	"net"
 	"strconv"
@@ -16,9 +17,10 @@ const (
 type Conn struct {
 	net.Conn
 	*Cipher
-	readBuf   []byte
-	writeBuf  []byte
-	chunkId   uint32
+	SuftEndPoint *suft.Endpoint
+	readBuf      []byte
+	writeBuf     []byte
+	chunkId      uint32
 }
 
 func NewConn(c net.Conn, cipher *Cipher) *Conn {
@@ -58,10 +60,18 @@ func RawAddr(addr string) (buf []byte, err error) {
 // This is intended for use by users implementing a local socks proxy.
 // rawaddr shoud contain part of the data in socks request, starting from the
 // ATYP field. (Refer to rfc1928 for more information.)
-func DialWithRawAddr(rawaddr []byte, server string, cipher *Cipher) (c *Conn, err error) {
-	conn, err := net.Dial("tcp", server)
-	if err != nil {
-		return
+func DialWithRawAddr(rawaddr []byte, server string, cipher *Cipher, suftEndpoint *suft.Endpoint) (c *Conn, err error) {
+	var conn net.Conn
+	if suftEndpoint != nil {
+		conn, err = suftEndpoint.Dial(server)
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		conn, err = net.Dial("tcp", server)
+		if err != nil {
+			return
+		}
 	}
 	c = NewConn(conn, cipher)
 	if cipher.ota {
@@ -83,12 +93,12 @@ func DialWithRawAddr(rawaddr []byte, server string, cipher *Cipher) (c *Conn, er
 }
 
 // addr should be in the form of host:port
-func Dial(addr, server string, cipher *Cipher) (c *Conn, err error) {
+func Dial(addr, server string, cipher *Cipher, suftEndpoint *suft.Endpoint) (c *Conn, err error) {
 	ra, err := RawAddr(addr)
 	if err != nil {
 		return
 	}
-	return DialWithRawAddr(ra, server, cipher)
+	return DialWithRawAddr(ra, server, cipher, suftEndpoint)
 }
 
 func (c *Conn) GetIv() (iv []byte) {

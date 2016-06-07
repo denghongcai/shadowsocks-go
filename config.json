@@ -4,5 +4,9 @@
     "local_port":1080,
     "password":"barfoo!",
     "method": "aes-128-cfb-auth",
-    "timeout":600
+    "timeout":600,
+    "suft": {
+        "local_addr": 8388,
+        "bandwidth": 50
+    }
 }

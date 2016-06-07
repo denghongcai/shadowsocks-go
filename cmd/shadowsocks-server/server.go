@@ -17,7 +17,8 @@ import (
 	"sync"
 	"syscall"
 
-	ss "github.com/shadowsocks/shadowsocks-go/shadowsocks"
+	ss "github.com/denghongcai/shadowsocks-go/shadowsocks"
+	"github.com/spance/suft/protocol"
 )
 
 const (
@@ -268,14 +269,32 @@ func waitSignal() {
 }
 
 func run(port, password string, auth bool) {
-	ln, err := net.Listen("tcp", ":"+port)
-	if err != nil {
-		log.Printf("error listening port %v: %v\n", port, err)
-		os.Exit(1)
+	var ln net.Listener
+	if len(config.SuftParams) == 0 {
+		l, err := net.Listen("tcp", ":"+port)
+		if err != nil {
+			log.Printf("error listening port %v: %v\n", port, err)
+			os.Exit(1)
+		}
+		ln = l
+		log.Printf("server listening port %v ...\n", port)
+	} else {
+		suftParams := &suft.Params{}
+		suftParams.Bandwidth = int64(config.SuftParams["bandwidth"].(float64))
+		suftParams.LocalAddr = config.SuftParams["local_addr"].(string)
+		suftParams.FastRetransmit = true
+		suftParams.FlatTraffic = true
+		suftParams.IsServ = true
+		l, err := suft.NewEndpoint(suftParams)
+		if err != nil {
+			log.Printf("error listening on %v: %v\n", suftParams.LocalAddr, err)
+			os.Exit(1)
+		}
+		ln = l
+		log.Printf("server listening on %v ...\n", suftParams.LocalAddr)
 	}
 	passwdManager.add(port, password, ln)
 	var cipher *ss.Cipher
-	log.Printf("server listening port %v ...\n", port)
 	for {
 		conn, err := ln.Accept()
 		if err != nil {
@@ -293,6 +312,7 @@ func run(port, password string, auth bool) {
 				continue
 			}
 		}
+		debug.Printf("%#v", conn)
 		go handleConnection(ss.NewConn(conn, cipher.Copy()), auth)
 	}
 }

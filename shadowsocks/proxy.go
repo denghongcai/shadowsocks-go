@@ -2,16 +2,18 @@ package shadowsocks
 
 import (
 	"errors"
-	"strings"
 	"fmt"
+	"github.com/spance/suft/protocol"
 	"net"
+	"strings"
 	"time"
 )
 
 type Dialer struct {
-	cipher *Cipher
-	server string
-	support_udp bool
+	cipher       *Cipher
+	suftEndpoint *suft.Endpoint
+	server       string
+	support_udp  bool
 }
 
 type ProxyConn struct {
@@ -26,27 +28,28 @@ type ProxyAddr struct {
 
 var ErrNilCipher = errors.New("cipher can't be nil.")
 
-func NewDialer(server string, cipher *Cipher) (dialer *Dialer, err error) {
+func NewDialer(server string, cipher *Cipher, suftEndpoint *suft.Endpoint) (dialer *Dialer, err error) {
 	// Currently shadowsocks-go do not support UDP
 	if cipher == nil {
 		return nil, ErrNilCipher
 	}
-	return &Dialer {
-		cipher: cipher,
-		server: server,
-		support_udp: false,
+	return &Dialer{
+		cipher:       cipher,
+		suftEndpoint: suftEndpoint,
+		server:       server,
+		support_udp:  false,
 	}, nil
 }
 
 func (d *Dialer) Dial(network, addr string) (c net.Conn, err error) {
 	if strings.HasPrefix(network, "tcp") {
-		conn, err := Dial(addr, d.server, d.cipher.Copy())
+		conn, err := Dial(addr, d.server, d.cipher.Copy(), d.suftEndpoint)
 		if err != nil {
 			return nil, err
 		}
-		return &ProxyConn {
+		return &ProxyConn{
 			Conn: conn,
-			raddr: &ProxyAddr {
+			raddr: &ProxyAddr{
 				network: network,
 				address: addr,
 			},
